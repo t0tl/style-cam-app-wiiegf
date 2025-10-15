@@ -54,7 +54,7 @@ export const useOutfitGeneration = () => {
 
       // Create FormData with multipart fields
       const formData = new FormData();
-      // @ts-ignore - React Native FormData accepts this format
+      // @ts-expect-error - React Native FormData accepts this format
       formData.append('image', imageBlob);
       formData.append('prompt', `Transform this person's outfit into a ${style} style. Keep the person's face and body the same, only change their clothing to match the ${style} aesthetic.`);
 
