@@ -1,54 +1,60 @@
 
 import React from 'react';
 import { Platform } from 'react-native';
-import { NativeTabs, Icon, Label } from 'expo-router/unstable-native-tabs';
-import { Stack } from 'expo-router';
-import FloatingTabBar, { TabBarItem } from '@/components/FloatingTabBar';
+import { Tabs } from 'expo-router';
+import { IconSymbol } from '@/components/IconSymbol';
 import { colors } from '@/styles/commonStyles';
+import { useTheme } from '@react-navigation/native';
 
 export default function TabLayout() {
-  const tabs: TabBarItem[] = [
-    {
-      name: '(home)',
-      route: '/(tabs)/(home)/',
-      icon: 'camera.fill',
-      label: 'Camera',
-    },
-    {
-      name: 'profile',
-      route: '/(tabs)/profile',
-      icon: 'photo.stack.fill',
-      label: 'Saved',
-    },
-  ];
-
-  if (Platform.OS === 'ios') {
-    return (
-      <NativeTabs>
-        <NativeTabs.Trigger name="(home)">
-          <Icon sf="camera.fill" drawable="ic_camera" />
-          <Label>Camera</Label>
-        </NativeTabs.Trigger>
-        <NativeTabs.Trigger name="profile">
-          <Icon sf="photo.stack.fill" drawable="ic_photo" />
-          <Label>Saved</Label>
-        </NativeTabs.Trigger>
-      </NativeTabs>
-    );
-  }
+  const theme = useTheme();
 
   return (
-    <>
-      <Stack
-        screenOptions={{
-          headerShown: false,
-          animation: 'none',
+    <Tabs
+      screenOptions={{
+        headerShown: false,
+        tabBarActiveTintColor: colors.primary,
+        tabBarInactiveTintColor: colors.text,
+        tabBarStyle: {
+          backgroundColor: theme.dark ? '#1e1e1e' : '#ffffff',
+          borderTopWidth: 1,
+          borderTopColor: theme.dark ? '#333333' : '#e5e5e5',
+          paddingBottom: Platform.OS === 'ios' ? 20 : 10,
+          paddingTop: 10,
+          height: Platform.OS === 'ios' ? 85 : 65,
+        },
+        tabBarLabelStyle: {
+          fontSize: 11,
+          fontWeight: '500',
+        },
+      }}
+    >
+      <Tabs.Screen
+        name="(home)"
+        options={{
+          title: 'Camera',
+          tabBarIcon: ({ color, focused }) => (
+            <IconSymbol
+              name="camera.fill"
+              size={24}
+              color={color}
+            />
+          ),
         }}
-      >
-        <Stack.Screen name="(home)" />
-        <Stack.Screen name="profile" />
-      </Stack>
-      <FloatingTabBar tabs={tabs} />
-    </>
+      />
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Saved',
+          tabBarIcon: ({ color, focused }) => (
+            <IconSymbol
+              name="photo.stack.fill"
+              size={24}
+              color={color}
+            />
+          ),
+        }}
+      />
+    </Tabs>
   );
 }
