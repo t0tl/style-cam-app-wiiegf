@@ -42,54 +42,102 @@ export const useOutfitGeneration = () => {
 
       console.log('User authenticated, calling edge function...');
 
-      // Call the edge function
-      const { data, error: functionError } = await supabase.functions.invoke(
-        'generate-outfit',
-        {
-          body: {
-            imageData,
-            style,
-            mimeType,
-          },
-        }
-      );
+      // Convert base64 image data to a Blob
+      const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
+      const byteCharacters = atob(base64Data);
+      const byteNumbers = new Array(byteCharacters.length);
+      for (let i = 0; i < byteCharacters.length; i++) {
+        byteNumbers[i] = byteCharacters.charCodeAt(i);
+      }
+      const byteArray = new Uint8Array(byteNumbers);
+      const blob = new Blob([byteArray], { type: mimeType });
+
+      // Create FormData with multipart fields
+      const formData = new FormData();
+      formData.append('image', blob, 'photo.jpg');
+      formData.append('prompt', `Transform this person's outfit into a ${style} style. Keep the person's face and body the same, only change their clothing to match the ${style} aesthetic.`);
+
+      console.log('Sending multipart form-data to edge function...');
+
+      // Get the project URL and anon key
+      const { data: { url } } = await supabase.auth.getSession();
+      const projectUrl = 'https://qtnthtvhndbdxczoexyn.supabase.co';
+      
+      // Call the edge function using fetch with FormData
+      const response = await fetch(`${projectUrl}/functions/v1/generate-outfit`, {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+        body: formData,
+      });
 
       console.log('Edge function response received');
-      console.log('Data:', data);
-      console.log('Error:', functionError);
+      console.log('Status:', response.status);
+      console.log('Content-Type:', response.headers.get('content-type'));
 
-      if (functionError) {
-        console.error('Edge function error:', functionError);
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('Edge function error:', errorText);
         
-        // Provide more specific error messages
         let errorMessage = 'Failed to generate outfit';
         
-        if (functionError.message) {
-          errorMessage = functionError.message;
+        try {
+          const errorData = JSON.parse(errorText);
+          errorMessage = errorData.error || errorData.message || errorMessage;
+        } catch {
+          errorMessage = errorText || errorMessage;
         }
         
         // Check for common error patterns
-        if (functionError.message?.includes('503')) {
+        if (response.status === 503) {
           errorMessage = 'The AI service is temporarily unavailable. Please try again in a moment.';
-        } else if (functionError.message?.includes('401')) {
+        } else if (response.status === 401) {
           errorMessage = 'Authentication failed. Please sign in again.';
-        } else if (functionError.message?.includes('timeout')) {
+        } else if (errorMessage.includes('timeout')) {
           errorMessage = 'The request took too long. Please try again with a smaller image.';
         }
         
         throw new Error(errorMessage);
       }
 
-      // Check if the response indicates failure
-      if (data && !data.success) {
-        console.error('Edge function returned failure:', data);
-        throw new Error(data.error || data.details || 'Failed to generate outfit');
+      const contentType = response.headers.get('content-type') || '';
+      
+      // Check if the response is an image
+      if (contentType.includes('image/')) {
+        console.log('Received image response');
+        const imageBlob = await response.blob();
+        
+        // Convert blob to base64 for display
+        const reader = new FileReader();
+        const imageDataUrl = await new Promise<string>((resolve, reject) => {
+          reader.onloadend = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(imageBlob);
+        });
+        
+        setLoading(false);
+        return {
+          success: true,
+          imageUrl: imageDataUrl,
+          style,
+          message: 'Outfit generated successfully!',
+        };
+      } else if (contentType.includes('application/json')) {
+        // Handle JSON response (text-based response)
+        const data = await response.json();
+        console.log('Received JSON response:', data);
+        
+        setLoading(false);
+        return {
+          success: true,
+          message: data.message || 'Outfit description generated!',
+          style,
+          note: 'The AI provided a text description instead of an image.',
+        };
+      } else {
+        throw new Error('Unexpected response format from edge function');
       }
-
-      console.log('Edge function succeeded');
-
-      setLoading(false);
-      return data as GenerateOutfitResponse;
     } catch (err) {
       console.error('Error generating outfit:', err);
       const errorMessage = err instanceof Error ? err.message : 'An unknown error occurred';
