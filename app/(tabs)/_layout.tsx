@@ -1,10 +1,10 @@
 
-import React from 'react';
-import { Platform } from 'react-native';
-import { Tabs } from 'expo-router';
-import { IconSymbol } from '@/components/IconSymbol';
 import { colors } from '@/styles/commonStyles';
 import { useTheme } from '@react-navigation/native';
+import { Platform } from 'react-native';
+import { IconSymbol } from '@/components/IconSymbol';
+import React from 'react';
+import { Tabs } from 'expo-router';
 
 export default function TabLayout() {
   const theme = useTheme();
@@ -12,20 +12,16 @@ export default function TabLayout() {
   return (
     <Tabs
       screenOptions={{
-        headerShown: false,
         tabBarActiveTintColor: colors.primary,
         tabBarInactiveTintColor: colors.text,
+        headerShown: false,
         tabBarStyle: {
-          backgroundColor: theme.dark ? '#1e1e1e' : '#ffffff',
+          backgroundColor: theme.colors.card,
+          borderTopColor: colors.border,
           borderTopWidth: 1,
-          borderTopColor: theme.dark ? '#333333' : '#e5e5e5',
-          paddingBottom: Platform.OS === 'ios' ? 20 : 10,
-          paddingTop: 10,
-          height: Platform.OS === 'ios' ? 85 : 65,
-        },
-        tabBarLabelStyle: {
-          fontSize: 11,
-          fontWeight: '500',
+          paddingBottom: Platform.OS === 'ios' ? 20 : 5,
+          paddingTop: 5,
+          height: Platform.OS === 'ios' ? 85 : 60,
         },
       }}
     >
@@ -33,12 +29,8 @@ export default function TabLayout() {
         name="(home)"
         options={{
           title: 'Camera',
-          tabBarIcon: ({ color, focused }) => (
-            <IconSymbol
-              name="camera.fill"
-              size={24}
-              color={color}
-            />
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="camera.fill" color={color} />
           ),
         }}
       />
@@ -46,12 +38,17 @@ export default function TabLayout() {
         name="profile"
         options={{
           title: 'Saved',
-          tabBarIcon: ({ color, focused }) => (
-            <IconSymbol
-              name="photo.stack.fill"
-              size={24}
-              color={color}
-            />
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="photo.stack.fill" color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="auth"
+        options={{
+          title: 'Account',
+          tabBarIcon: ({ color }) => (
+            <IconSymbol size={28} name="person.circle.fill" color={color} />
           ),
         }}
       />
