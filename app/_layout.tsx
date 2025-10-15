@@ -1,5 +1,6 @@
+
 import "react-native-reanimated";
-import React, { useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useFonts } from "expo-font";
 import { Stack, router } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
@@ -14,10 +15,10 @@ import {
   ThemeProvider,
 } from "@react-navigation/native";
 import { StatusBar } from "expo-status-bar";
-import { Button } from "@/components/button";
 import { WidgetProvider } from "@/contexts/WidgetContext";
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { colors } from "@/styles/commonStyles";
 
-// Prevent the splash screen from auto-hiding before asset loading is complete.
 SplashScreen.preventAutoHideAsync();
 
 export const unstable_settings = {
@@ -27,15 +28,34 @@ export const unstable_settings = {
 export default function RootLayout() {
   const colorScheme = useColorScheme();
   const networkState = useNetworkState();
+  const [hasOnboarded, setHasOnboarded] = useState<boolean | null>(null);
   const [loaded] = useFonts({
     SpaceMono: require("../assets/fonts/SpaceMono-Regular.ttf"),
   });
 
   useEffect(() => {
-    if (loaded) {
+    const checkOnboarding = async () => {
+      try {
+        const value = await AsyncStorage.getItem('hasOnboarded');
+        console.log('Onboarding status:', value);
+        setHasOnboarded(value === 'true');
+      } catch (error) {
+        console.log('Error checking onboarding status:', error);
+        setHasOnboarded(false);
+      }
+    };
+    checkOnboarding();
+  }, []);
+
+  useEffect(() => {
+    if (loaded && hasOnboarded !== null) {
       SplashScreen.hideAsync();
+      if (!hasOnboarded) {
+        console.log('First launch, showing onboarding');
+        router.replace('/onboarding');
+      }
     }
-  }, [loaded]);
+  }, [loaded, hasOnboarded]);
 
   React.useEffect(() => {
     if (
@@ -49,7 +69,7 @@ export default function RootLayout() {
     }
   }, [networkState.isConnected, networkState.isInternetReachable]);
 
-  if (!loaded) {
+  if (!loaded || hasOnboarded === null) {
     return null;
   }
 
@@ -57,39 +77,38 @@ export default function RootLayout() {
     ...DefaultTheme,
     dark: false,
     colors: {
-      primary: "rgb(0, 122, 255)", // System Blue
-      background: "rgb(242, 242, 247)", // Light mode background
-      card: "rgb(255, 255, 255)", // White cards/surfaces
-      text: "rgb(0, 0, 0)", // Black text for light mode
-      border: "rgb(216, 216, 220)", // Light gray for separators/borders
-      notification: "rgb(255, 59, 48)", // System Red
+      primary: colors.primary,
+      background: colors.background,
+      card: colors.card,
+      text: colors.text,
+      border: '#E0E0E0',
+      notification: colors.accent,
     },
   };
 
   const CustomDarkTheme: Theme = {
     ...DarkTheme,
     colors: {
-      primary: "rgb(10, 132, 255)", // System Blue (Dark Mode)
-      background: "rgb(1, 1, 1)", // True black background for OLED displays
-      card: "rgb(28, 28, 30)", // Dark card/surface color
-      text: "rgb(255, 255, 255)", // White text for dark mode
-      border: "rgb(44, 44, 46)", // Dark gray for separators/borders
-      notification: "rgb(255, 69, 58)", // System Red (Dark Mode)
+      primary: colors.primary,
+      background: '#121212',
+      card: '#1E1E1E',
+      text: '#FFFFFF',
+      border: '#2C2C2C',
+      notification: colors.accent,
     },
   };
+
   return (
     <>
       <StatusBar style="auto" animated />
-        <ThemeProvider
-          value={colorScheme === "dark" ? CustomDarkTheme : CustomDefaultTheme}
-        >
-          <WidgetProvider>
-            <GestureHandlerRootView>
+      <ThemeProvider
+        value={colorScheme === "dark" ? CustomDarkTheme : CustomDefaultTheme}
+      >
+        <WidgetProvider>
+          <GestureHandlerRootView>
             <Stack>
-              {/* Main app with tabs */}
+              <Stack.Screen name="onboarding" options={{ headerShown: false }} />
               <Stack.Screen name="(tabs)" options={{ headerShown: false }} />
-
-              {/* Modal Demo Screens */}
               <Stack.Screen
                 name="modal"
                 options={{
@@ -116,9 +135,9 @@ export default function RootLayout() {
               />
             </Stack>
             <SystemBars style={"auto"} />
-            </GestureHandlerRootView>
-          </WidgetProvider>
-        </ThemeProvider>
+          </GestureHandlerRootView>
+        </WidgetProvider>
+      </ThemeProvider>
     </>
   );
 }
