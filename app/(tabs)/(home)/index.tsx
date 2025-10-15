@@ -12,6 +12,7 @@ import {
   Image,
   ActivityIndicator,
   Modal,
+  ScrollView,
 } from "react-native";
 import { CameraView, CameraType, useCameraPermissions } from "expo-camera";
 import { IconSymbol } from "@/components/IconSymbol";
@@ -41,6 +42,7 @@ export default function CameraScreen() {
   const [flash, setFlash] = useState<"off" | "on">("off");
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [generatedImage, setGeneratedImage] = useState<string | null>(null);
+  const [generatedMessage, setGeneratedMessage] = useState<string | null>(null);
   const [showResultModal, setShowResultModal] = useState(false);
   const cameraRef = useRef<CameraView>(null);
   const { generateOutfit, loading, error } = useOutfitGeneration();
@@ -49,6 +51,13 @@ export default function CameraScreen() {
     console.log("Camera screen mounted");
     checkAuth();
   }, []);
+
+  useEffect(() => {
+    if (error) {
+      console.log("Error detected:", error);
+      Alert.alert("Error", error);
+    }
+  }, [error]);
 
   const checkAuth = async () => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -109,7 +118,7 @@ export default function CameraScreen() {
         Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
         
         const photo = await cameraRef.current.takePictureAsync({
-          quality: 0.8,
+          quality: 0.7,
           base64: true,
         });
         
@@ -131,11 +140,13 @@ export default function CameraScreen() {
               mimeType: 'image/jpeg',
             });
 
-            if (result) {
+            if (result && result.success) {
               console.log("Outfit generation result:", result);
               
               if (result.imageUrl) {
+                // We have a generated image
                 setGeneratedImage(result.imageUrl);
+                setGeneratedMessage(result.message || null);
                 setShowResultModal(true);
                 
                 // Save to local storage
@@ -151,20 +162,45 @@ export default function CameraScreen() {
                 
                 outfits.unshift(newOutfit);
                 await AsyncStorage.setItem("savedOutfits", JSON.stringify(outfits));
-              } else {
-                // Show the text response
-                Alert.alert(
-                  "Style Analysis",
-                  result.message || "Outfit transformation completed",
-                  [
-                    {
-                      text: "OK",
-                      onPress: () => console.log("Alert dismissed"),
-                    },
-                  ]
-                );
+              } else if (result.message) {
+                // We have a text description
+                setGeneratedImage(null);
+                setGeneratedMessage(result.message);
+                setShowResultModal(true);
+                
+                // Save the original photo with the description
+                const savedOutfits = await AsyncStorage.getItem("savedOutfits");
+                const outfits = savedOutfits ? JSON.parse(savedOutfits) : [];
+                
+                const newOutfit = {
+                  id: Date.now().toString(),
+                  uri: photo.uri,
+                  style: selectedStyle,
+                  timestamp: new Date().toISOString(),
+                  description: result.message,
+                };
+                
+                outfits.unshift(newOutfit);
+                await AsyncStorage.setItem("savedOutfits", JSON.stringify(outfits));
               }
+            } else {
+              // Generation failed
+              console.log("Generation failed or returned null");
+              Alert.alert(
+                "Generation Failed",
+                "Unable to generate outfit transformation. Please try again."
+              );
             }
+          } else if (selectedStyle !== "none" && !isAuthenticated) {
+            // User needs to sign in
+            Alert.alert(
+              "Sign In Required",
+              "Please sign in to use AI style transformation features.",
+              [
+                { text: "Cancel", style: "cancel" },
+                { text: "Sign In", onPress: () => console.log("Navigate to auth") },
+              ]
+            );
           } else {
             // Just save the original photo
             const savedOutfits = await AsyncStorage.getItem("savedOutfits");
@@ -210,6 +246,7 @@ export default function CameraScreen() {
   const closeResultModal = () => {
     setShowResultModal(false);
     setGeneratedImage(null);
+    setGeneratedMessage(null);
   };
 
   return (
@@ -257,6 +294,7 @@ export default function CameraScreen() {
               <View style={styles.loadingContainer}>
                 <ActivityIndicator size="large" color={colors.primary} />
                 <Text style={styles.loadingText}>Generating your new outfit...</Text>
+                <Text style={styles.loadingSubtext}>This may take a moment</Text>
               </View>
             </View>
           )}
@@ -322,19 +360,31 @@ export default function CameraScreen() {
             <View style={[styles.modalContent, { backgroundColor: theme.colors.card }]}>
               <View style={styles.modalHeader}>
                 <Text style={[styles.modalTitle, { color: theme.colors.text }]}>
-                  Your New Outfit
+                  {generatedImage ? "Your New Outfit" : "Style Analysis"}
                 </Text>
                 <TouchableOpacity onPress={closeResultModal}>
                   <IconSymbol name="xmark.circle.fill" size={28} color={colors.textSecondary} />
                 </TouchableOpacity>
               </View>
               
-              {generatedImage && (
+              {generatedImage ? (
                 <Image
                   source={{ uri: generatedImage }}
                   style={styles.resultImage}
                   resizeMode="contain"
                 />
+              ) : (
+                <ScrollView style={styles.messageContainer}>
+                  <Text style={[styles.messageText, { color: theme.colors.text }]}>
+                    {generatedMessage || "Outfit transformation completed"}
+                  </Text>
+                  <View style={styles.noteContainer}>
+                    <IconSymbol name="info.circle.fill" size={20} color={colors.primary} />
+                    <Text style={[styles.noteText, { color: colors.textSecondary }]}>
+                      Image generation is currently in development. This is a detailed description of how your outfit would look in the selected style.
+                    </Text>
+                  </View>
+                </ScrollView>
               )}
               
               <TouchableOpacity
@@ -444,12 +494,16 @@ const styles = StyleSheet.create({
     padding: 30,
     borderRadius: 20,
     alignItems: "center",
-    gap: 15,
+    gap: 10,
   },
   loadingText: {
     fontSize: 16,
     fontWeight: "600",
     color: colors.text,
+  },
+  loadingSubtext: {
+    fontSize: 14,
+    color: colors.textSecondary,
   },
   controlsContainer: {
     position: "absolute",
@@ -517,6 +571,7 @@ const styles = StyleSheet.create({
   modalContent: {
     width: "100%",
     maxWidth: 400,
+    maxHeight: "80%",
     borderRadius: 20,
     padding: 20,
     boxShadow: "0px 8px 24px rgba(0, 0, 0, 0.3)",
@@ -537,6 +592,28 @@ const styles = StyleSheet.create({
     height: 400,
     borderRadius: 12,
     marginBottom: 20,
+  },
+  messageContainer: {
+    maxHeight: 400,
+    marginBottom: 20,
+  },
+  messageText: {
+    fontSize: 16,
+    lineHeight: 24,
+    marginBottom: 16,
+  },
+  noteContainer: {
+    flexDirection: "row",
+    backgroundColor: colors.background,
+    padding: 12,
+    borderRadius: 8,
+    gap: 8,
+    alignItems: "flex-start",
+  },
+  noteText: {
+    flex: 1,
+    fontSize: 14,
+    lineHeight: 20,
   },
   modalButton: {
     paddingVertical: 16,
