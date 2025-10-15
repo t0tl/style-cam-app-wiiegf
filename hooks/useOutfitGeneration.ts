@@ -42,25 +42,25 @@ export const useOutfitGeneration = () => {
 
       console.log('User authenticated, calling edge function...');
 
-      // Convert base64 image data to a Blob
+      // Convert base64 image data to a Blob using the proper React Native approach
       const base64Data = imageData.replace(/^data:image\/\w+;base64,/, '');
-      const byteCharacters = atob(base64Data);
-      const byteNumbers = new Array(byteCharacters.length);
-      for (let i = 0; i < byteCharacters.length; i++) {
-        byteNumbers[i] = byteCharacters.charCodeAt(i);
-      }
-      const byteArray = new Uint8Array(byteNumbers);
-      const blob = new Blob([byteArray], { type: mimeType });
+      
+      // Create a File-like object that React Native's FormData can handle
+      const imageBlob = {
+        uri: `data:${mimeType};base64,${base64Data}`,
+        type: mimeType,
+        name: 'photo.jpg',
+      };
 
       // Create FormData with multipart fields
       const formData = new FormData();
-      formData.append('image', blob, 'photo.jpg');
+      // @ts-ignore - React Native FormData accepts this format
+      formData.append('image', imageBlob);
       formData.append('prompt', `Transform this person's outfit into a ${style} style. Keep the person's face and body the same, only change their clothing to match the ${style} aesthetic.`);
 
       console.log('Sending multipart form-data to edge function...');
 
-      // Get the project URL and anon key
-      const { data: { url } } = await supabase.auth.getSession();
+      // Get the project URL
       const projectUrl = 'https://qtnthtvhndbdxczoexyn.supabase.co';
       
       // Call the edge function using fetch with FormData
@@ -68,6 +68,7 @@ export const useOutfitGeneration = () => {
         method: 'POST',
         headers: {
           'Authorization': `Bearer ${session.access_token}`,
+          // Don't set Content-Type header - let the browser/fetch set it with the boundary
         },
         body: formData,
       });
