@@ -44,6 +44,13 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingBottom: 8,
   },
+  containerVertical: {
+    position: 'absolute',
+    bottom: 20,
+    right: 20,
+    alignItems: 'flex-end',
+    paddingBottom: 0,
+  },
   tabBar: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -52,21 +59,47 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     overflow: 'hidden',
   },
+  tabBarVertical: {
+    flexDirection: 'column',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+    overflow: 'hidden',
+  },
   tabButton: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingVertical: 8,
   },
+  tabButtonVertical: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 8,
+    width: '100%',
+  },
   tabLabel: {
     fontSize: 11,
     marginTop: 4,
+    fontWeight: '500',
+  },
+  tabLabelVertical: {
+    fontSize: 10,
+    marginTop: 2,
     fontWeight: '500',
   },
   indicator: {
     position: 'absolute',
     height: 3,
     bottom: 0,
+    borderRadius: 1.5,
+  },
+  indicatorVertical: {
+    position: 'absolute',
+    width: 3,
+    right: 0,
     borderRadius: 1.5,
   },
 });
@@ -81,6 +114,10 @@ export default function FloatingTabBar({
   const theme = useTheme();
   const pathname = usePathname();
   const indicatorPosition = useSharedValue(0);
+
+  // Check if we're on the camera view
+  const isCameraView = pathname === '/(tabs)/(home)/index' || pathname === '/(tabs)/(home)';
+  console.log('Current pathname:', pathname, 'isCameraView:', isCameraView);
 
   const currentTabIndex = tabs.findIndex((tab) => pathname.includes(tab.name));
 
@@ -99,33 +136,54 @@ export default function FloatingTabBar({
   };
 
   const indicatorStyle = useAnimatedStyle(() => {
-    const tabWidth = containerWidth / tabs.length;
-    return {
-      transform: [
-        {
-          translateX: interpolate(
-            indicatorPosition.value,
-            [0, tabs.length - 1],
-            [0, (tabs.length - 1) * tabWidth]
-          ),
-        },
-      ],
-      width: tabWidth,
-    };
+    if (isCameraView) {
+      // Vertical indicator
+      const tabHeight = 60; // Approximate height per tab
+      return {
+        transform: [
+          {
+            translateY: interpolate(
+              indicatorPosition.value,
+              [0, tabs.length - 1],
+              [0, (tabs.length - 1) * tabHeight]
+            ),
+          },
+        ],
+        height: tabHeight,
+      };
+    } else {
+      // Horizontal indicator
+      const tabWidth = containerWidth / tabs.length;
+      return {
+        transform: [
+          {
+            translateX: interpolate(
+              indicatorPosition.value,
+              [0, tabs.length - 1],
+              [0, (tabs.length - 1) * tabWidth]
+            ),
+          },
+        ],
+        width: tabWidth,
+      };
+    }
   });
 
   return (
     <SafeAreaView
-      style={[styles.container, { marginBottom: bottomMargin }]}
+      style={[
+        isCameraView ? styles.containerVertical : styles.container,
+        !isCameraView && { marginBottom: bottomMargin },
+      ]}
       edges={['bottom']}
     >
       <BlurView
         intensity={80}
         tint={theme.dark ? 'dark' : 'light'}
         style={[
-          styles.tabBar,
+          isCameraView ? styles.tabBarVertical : styles.tabBar,
           {
-            width: containerWidth,
+            width: isCameraView ? 70 : containerWidth,
             borderRadius,
             backgroundColor: theme.dark
               ? 'rgba(30, 30, 30, 0.8)'
@@ -140,7 +198,7 @@ export default function FloatingTabBar({
           return (
             <TouchableOpacity
               key={tab.name}
-              style={styles.tabButton}
+              style={isCameraView ? styles.tabButtonVertical : styles.tabButton}
               onPress={() => handleTabPress(tab.route)}
             >
               <IconSymbol
@@ -150,7 +208,7 @@ export default function FloatingTabBar({
               />
               <Text
                 style={[
-                  styles.tabLabel,
+                  isCameraView ? styles.tabLabelVertical : styles.tabLabel,
                   {
                     color: isActive ? colors.primary : colors.text,
                   },
@@ -163,7 +221,7 @@ export default function FloatingTabBar({
         })}
         <Animated.View
           style={[
-            styles.indicator,
+            isCameraView ? styles.indicatorVertical : styles.indicator,
             indicatorStyle,
             { backgroundColor: colors.primary },
           ]}
